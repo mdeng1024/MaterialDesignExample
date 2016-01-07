@@ -2,14 +2,12 @@ package com.aswifter.material.book;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import com.loopj.android.http.AsyncHttpClient;
-import com.loopj.android.http.AsyncHttpResponseHandler;
-import com.loopj.android.http.RequestParams;
-
-import org.apache.http.Header;
+import okhttp3.*;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.List;
@@ -215,7 +213,7 @@ public class Book implements Serializable {
                 '}';
     }
 
-    private static AsyncHttpClient client = new AsyncHttpClient(true, 80, 443);
+    private static OkHttpClient client = new OkHttpClient();
 
     private static final String BASE_URL = "https://api.douban.com/v2/";
 
@@ -228,33 +226,40 @@ public class Book implements Serializable {
         void onData(T data);
     }
 
-    public static void searchBooks(String name, final IBookResponse<List<Book>> response) {
-        RequestParams params = new RequestParams();
-        params.put("q", name);
-        params.put("start", 0);
-        params.put("end", 50);
-        client.get(getAbsoluteUrl("book/search"), params, new AsyncHttpResponseHandler() {
-            @Override
-            public void onSuccess(int statusCode, Header[] headers, byte[] responseBody) {
-                try {
-                    Gson gson = new Gson();
-                    JSONObject json = new JSONObject(new String(responseBody));
-                    JSONArray jaBooks = json.optJSONArray("books");
-                    List<Book> books = gson.fromJson(jaBooks.toString(), new TypeToken<List<Book>>() {
-                    }.getType());
-                    response.onData(books);
+    public static void searchBooks(String name, final IBookResponse<List<Book>> responseCall) {
+        HttpUrl requestUrl = HttpUrl.parse(getAbsoluteUrl("book/search")).newBuilder()
+                .addQueryParameter("q", name)
+                .addQueryParameter("start", "0")
+                .addQueryParameter("end", "50")
+                .build();
 
-                } catch (Exception e) {
+        Request request = new Request.Builder()
+                .url(requestUrl)
+                .build();
+
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Request request, IOException e) {
+                e.printStackTrace();
+            }
+
+            @Override
+            public void onResponse(Response response) throws IOException {
+                if (!response.isSuccessful()) throw new IOException("Unexpected code " + response);
+
+                Gson gson = new Gson();
+                try {
+                    JSONObject json = new JSONObject(response.body().string());
+                    JSONArray jaBooks = json.optJSONArray("books");
+                    List<Book> books = gson.fromJson(jaBooks.toString(), new TypeToken<List<Book>>() {}.getType());
+
+                    responseCall.onData(books);
+                } catch (JSONException e) {
                     e.printStackTrace();
                 }
-
-            }
-
-            @Override
-            public void onFailure(int statusCode, Header[] headers, byte[] responseBody, Throwable error) {
-
             }
         });
+
     }
 
 
