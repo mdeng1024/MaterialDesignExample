@@ -76,10 +76,16 @@ public class BooksFragment extends Fragment {
         mAdapter.clearItems();
         Book.searchBooks(keyword, new Book.IBookResponse<List<Book>>() {
             @Override
-            public void onData(List<Book> books) {
-                mProgressBar.setVisibility(View.GONE);
-                startFABAnimation();
-                mAdapter.updateItems(books, true);
+            public void onData(final List<Book> books) {
+                getActivity().runOnUiThread(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        mProgressBar.setVisibility(View.GONE);
+                        startFABAnimation();
+                        mAdapter.updateItems(books, true);
+                    }
+                });
             }
         });
     }
